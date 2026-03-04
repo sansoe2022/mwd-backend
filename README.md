@@ -1,2 +1,4 @@
-## Link:
-https://sansoe2022.github.io/mwd-backend/
+## Required
+- Github Token
+- One Signal App id
+- One Signal Rest Api key

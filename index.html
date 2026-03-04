@@ -19,6 +19,8 @@
 </head>
 <body class="p-4 md:p-8">
 
+    <div id="toastContainer" class="fixed top-5 right-5 z-[9999] flex flex-col gap-3 pointer-events-none"></div>
+
     <div class="max-w-5xl mx-auto space-y-6">
         
         <div class="flex items-center justify-between mb-2">
@@ -55,7 +57,6 @@
                             <span class="material-icons">cloud_download</span> Load Data
                         </button>
                     </div>
-                    <div id="githubStatus" class="hidden mt-4 p-3 rounded-md text-sm font-medium"></div>
                 </div>
             </div>
 
@@ -210,8 +211,6 @@
                         <span class="material-icons">send</span> Send Notification
                     </button>
                 </div>
-
-                <div id="notiStatus" class="hidden mt-4 p-3 rounded-md text-sm font-medium"></div>
             </div>
 
             <div class="bg-white p-6 rounded-xl shadow-md">
@@ -261,6 +260,31 @@
     </div>
 
     <script>
+        // --- TOAST NOTIFICATION SYSTEM ---
+        function showToast(message, isError = false) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            const bgClass = isError ? 'bg-red-600' : 'bg-green-600';
+            const icon = isError ? 'error_outline' : 'check_circle';
+
+            // Base classes for the toast
+            toast.className = `${bgClass} text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto min-w-[250px]`;
+            toast.innerHTML = `<span class="material-icons">${icon}</span> <span class="font-medium text-sm">${message}</span>`;
+            
+            container.appendChild(toast);
+            
+            // Trigger reflow to apply slide-in animation
+            setTimeout(() => {
+                toast.classList.remove('translate-x-full', 'opacity-0');
+            }, 10);
+
+            // Remove toast after 3.5 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full', 'opacity-0');
+                setTimeout(() => toast.remove(), 300); // Wait for transition to finish before removing from DOM
+            }, 3500);
+        }
+
         // --- UI & TAB MANAGEMENT ---
         function switchTab(tabId) {
             document.getElementById('apiTab').classList.add('hidden');
@@ -314,7 +338,7 @@
             
             // Auto-load GitHub Data if token exists
             if (savedGithubToken) {
-                fetchData(true); // true means it's an auto-load
+                fetchData(true); 
             }
 
             // Auto-load OneSignal History if keys exist
@@ -332,22 +356,13 @@
         function b64_to_utf8(str) { return decodeURIComponent(escape(window.atob(str))); }
         function generateObjectId() { return [...Array(24)].map(() => Math.floor(Math.random() * 16).toString(16)).join(''); }
 
-        function showStatus(elementId, message, isError = false) {
-            const statusEl = document.getElementById(elementId);
-            statusEl.textContent = message;
-            statusEl.className = `mt-4 p-3 rounded-md text-sm font-medium block flex items-center gap-2 ${isError ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
-            statusEl.innerHTML = `<span class="material-icons">${isError ? 'error' : 'check_circle'}</span> ${message}`;
-            statusEl.style.display = 'block';
-            setTimeout(() => { statusEl.style.display = 'none'; }, 5000);
-        }
-
         async function fetchData(isAutoLoad = false) {
             const token = document.getElementById('githubToken').value;
             const btn = document.getElementById('loadBtn');
             const originalBtnHtml = btn.innerHTML;
 
             if (!token) { 
-                if(!isAutoLoad) showStatus('githubStatus', "Please enter your GitHub Token.", true); 
+                if(!isAutoLoad) showToast("Please enter your GitHub Token.", true); 
                 return; 
             }
             try {
@@ -369,13 +384,12 @@
                 renderTable(); 
                 document.getElementById('editorSection').classList.remove('hidden');
                 
-                // Keep Auth closed after loading
                 document.getElementById('githubAuthBody').classList.add('hidden');
                 document.getElementById('githubAuthIcon').textContent = 'expand_more';
 
-                if(!isAutoLoad) showStatus('githubStatus', "Data loaded successfully!");
+                if(!isAutoLoad) showToast("Data loaded successfully!");
             } catch (error) { 
-                showStatus('githubStatus', error.message, true); 
+                showToast(error.message, true); 
             } finally {
                 btn.innerHTML = originalBtnHtml;
                 btn.disabled = false;
@@ -399,12 +413,19 @@
 
         function addItem() {
             const thb = document.getElementById('newThb').value; const mmk = document.getElementById('newMmk').value;
-            if(!thb || !mmk) { alert("Please enter both values."); return; }
+            if(!thb || !mmk) { showToast("Please enter both values.", true); return; }
             itemsArray.push({ thbBill: thb.toString(), mmkBill: mmk.toString(), _id: generateObjectId() });
             document.getElementById('newThb').value = ''; document.getElementById('newMmk').value = ''; renderTable();
+            showToast("Item added successfully!");
         }
 
-        function deleteItem(index) { if(confirm("Delete this item?")) { itemsArray.splice(index, 1); renderTable(); } }
+        function deleteItem(index) { 
+            if(confirm("Delete this item?")) { 
+                itemsArray.splice(index, 1); 
+                renderTable(); 
+                showToast("Item deleted!");
+            } 
+        }
 
         async function saveData() {
             const token = document.getElementById('githubToken').value; const btn = event.currentTarget; const originalBtnHtml = btn.innerHTML;
@@ -421,8 +442,13 @@
                     body: JSON.stringify({ message: "Update via Web Panel", content: base64Content, sha: fileSha })
                 });
                 if (!response.ok) throw new Error("Failed to update data.");
-                const data = await response.json(); fileSha = data.content.sha; showStatus('githubStatus', "Successfully saved!");
-            } catch (error) { showStatus('githubStatus', error.message, true); } finally { btn.innerHTML = originalBtnHtml; btn.disabled = false; }
+                const data = await response.json(); fileSha = data.content.sha; 
+                showToast("GitHub Data successfully saved! 🎉");
+            } catch (error) { 
+                showToast(error.message, true); 
+            } finally { 
+                btn.innerHTML = originalBtnHtml; btn.disabled = false; 
+            }
         }
 
         // --- ONESIGNAL PUSH NOTIFICATION SECTION ---
@@ -480,11 +506,11 @@
             const imageUrl = document.getElementById('notiImage').value.trim();
 
             if (!appId || !apiKey) { 
-                showStatus('notiStatus', "App ID နှင့် API Key ကို Credentials ထဲတွင် အရင်ဖြည့်ပါ။", true); 
+                showToast("App ID နှင့် API Key ကို ဖြည့်ပါ။", true); 
                 toggleAccordion('osAuthBody', 'osAuthIcon');
                 return; 
             }
-            if (!title || !message) { showStatus('notiStatus', "Title နှင့် Message မရှိပါ။ Create ကို ပြန်နှိပ်ပါ။", true); return; }
+            if (!title || !message) { showToast("Title နှင့် Message မရှိပါ။ Create ကို ပြန်နှိပ်ပါ။", true); return; }
 
             const btn = event.currentTarget; const originalBtnHtml = btn.innerHTML;
             try {
@@ -499,7 +525,7 @@
                 const data = await response.json();
                 if (data.errors) throw new Error(data.errors[0] || "Failed to send notification.");
 
-                showStatus('notiStatus', "Push Notification အောင်မြင်စွာ ပို့ပြီးပါပြီ!");
+                showToast("Push Notification အောင်မြင်စွာ ပို့ပြီးပါပြီ! 🚀");
                 
                 document.getElementById('notiTitle').value = ''; document.getElementById('notiMessage').value = ''; document.getElementById('notiImage').value = '';
                 document.getElementById('previewEmpty').classList.remove('hidden');
@@ -507,7 +533,7 @@
                 
                 setTimeout(fetchRecentNotifications, 2000); 
 
-            } catch (error) { showStatus('notiStatus', error.message, true); } 
+            } catch (error) { showToast(error.message, true); } 
             finally { btn.innerHTML = originalBtnHtml; btn.disabled = false; }
         }
 

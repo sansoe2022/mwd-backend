@@ -15,6 +15,16 @@
         .tab-inactive { border-bottom: 2px solid transparent; color: #6b7280; }
         .tab-inactive:hover { color: #374151; }
         .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+        
+        /* Platform Toggle Styles */
+        .platform-btn { padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; transition: all 0.2s; cursor: pointer; border: 1px solid transparent; }
+        .platform-active { background-color: #e8eaf6; color: #3f51b5; border-color: #c5cae9; }
+        .platform-inactive { background-color: transparent; color: #9ca3af; }
+        .platform-inactive:hover { background-color: #f3f4f6; color: #6b7280; }
+
+        /* iOS specific styling overrides */
+        .ios-bubble { border-radius: 20px; background-color: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px); }
+        .ios-icon-container { border-radius: 8px; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -173,10 +183,20 @@
             </div>
 
             <div class="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <div class="flex justify-between items-center mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                     <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
                         <span class="material-icons text-purple-600">send_to_mobile</span> Notification Preview
                     </h3>
+                    
+                    <div id="platformSelector" class="hidden bg-gray-100 p-1 rounded-full flex gap-1 border border-gray-200">
+                        <button onclick="setPreviewPlatform('android')" id="btn-android" class="platform-btn platform-active flex items-center gap-1">
+                            <span class="material-icons" style="font-size: 14px;">android</span> Android
+                        </button>
+                        <button onclick="setPreviewPlatform('ios')" id="btn-ios" class="platform-btn platform-inactive flex items-center gap-1">
+                            <span class="material-icons" style="font-size: 14px;">phone_iphone</span> iOS
+                        </button>
+                    </div>
+
                     <button onclick="openModal()" class="bg-purple-100 text-purple-700 hover:bg-purple-200 px-4 py-2 rounded-md font-bold transition flex items-center gap-2">
                         <span class="material-icons" style="font-size: 18px;">edit_note</span> Create
                     </button>
@@ -188,17 +208,17 @@
                 </div>
 
                 <div id="previewFilled" class="hidden flex flex-col items-center">
-                    <div class="bg-gray-100 w-full max-w-sm rounded-[2rem] p-4 shadow-inner border-4 border-gray-300 relative">
+                    <div id="deviceContainer" class="bg-gray-100 w-full max-w-sm rounded-[2rem] p-4 shadow-inner border-4 border-gray-300 relative transition-all duration-300">
                         <div class="flex justify-between items-center px-4 mb-4 text-gray-400 text-[10px]">
-                            <span>12:00</span>
+                            <span id="statusBarTime">12:00</span>
                             <div class="flex gap-1"><span class="material-icons" style="font-size: 12px;">wifi</span><span class="material-icons" style="font-size: 12px;">battery_full</span></div>
                         </div>
                         
-                        <div class="bg-white p-3 rounded-2xl shadow-sm mb-4 cursor-pointer hover:bg-gray-50 transition" onclick="toggleNotiPreview()">
+                        <div id="notiBubble" class="bg-white p-3 rounded-2xl shadow-sm mb-4 cursor-pointer hover:bg-gray-50 transition" onclick="toggleNotiPreview()">
                             <div class="flex items-center gap-2 mb-2">
-                                <div class="w-5 h-5 bg-purple-500 rounded flex items-center justify-center text-white text-[10px]"><span class="material-icons" style="font-size: 12px;">notifications</span></div>
+                                <div id="notiIconBox" class="w-5 h-5 bg-purple-500 rounded flex items-center justify-center text-white text-[10px]"><span class="material-icons" style="font-size: 12px;">notifications</span></div>
                                 <span class="text-[11px] font-bold text-gray-600 flex-1">MWD App</span>
-                                <span class="text-[10px] text-gray-400">Now</span>
+                                <span id="notiTimeLabel" class="text-[10px] text-gray-400">Now</span>
                                 <span id="prevExpandIcon" class="material-icons text-gray-400" style="font-size: 16px;">expand_more</span>
                             </div>
                             <h4 id="prevTitle" class="font-bold text-gray-800 text-sm mb-1">Title</h4>
@@ -267,21 +287,15 @@
             const bgClass = isError ? 'bg-red-600' : 'bg-green-600';
             const icon = isError ? 'error_outline' : 'check_circle';
 
-            // Base classes for the toast
             toast.className = `${bgClass} text-white px-5 py-3 rounded-lg shadow-xl flex items-center gap-3 transform transition-all duration-300 translate-x-full opacity-0 pointer-events-auto min-w-[250px]`;
             toast.innerHTML = `<span class="material-icons">${icon}</span> <span class="font-medium text-sm">${message}</span>`;
             
             container.appendChild(toast);
             
-            // Trigger reflow to apply slide-in animation
-            setTimeout(() => {
-                toast.classList.remove('translate-x-full', 'opacity-0');
-            }, 10);
-
-            // Remove toast after 3.5 seconds
+            setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); }, 10);
             setTimeout(() => {
                 toast.classList.add('translate-x-full', 'opacity-0');
-                setTimeout(() => toast.remove(), 300); // Wait for transition to finish before removing from DOM
+                setTimeout(() => toast.remove(), 300); 
             }, 3500);
         }
 
@@ -336,12 +350,8 @@
             
             autoCollapseIfSaved(); 
             
-            // Auto-load GitHub Data if token exists
-            if (savedGithubToken) {
-                fetchData(true); 
-            }
+            if (savedGithubToken) { fetchData(true); }
 
-            // Auto-load OneSignal History if keys exist
             if(document.getElementById('osAppId').value && document.getElementById('osApiKey').value) {
                 fetchRecentNotifications();
             }
@@ -454,11 +464,52 @@
         // --- ONESIGNAL PUSH NOTIFICATION SECTION ---
         let recentNotificationsData = [];
         let isPreviewExpanded = false;
+        let currentPlatform = 'android';
 
         function openModal() { document.getElementById('createModal').classList.remove('hidden'); }
         function closeModal() { document.getElementById('createModal').classList.add('hidden'); }
 
+        function setPreviewPlatform(platform) {
+            currentPlatform = platform;
+            
+            // Update Buttons
+            document.getElementById('btn-android').className = platform === 'android' ? 'platform-btn platform-active flex items-center gap-1' : 'platform-btn platform-inactive flex items-center gap-1';
+            document.getElementById('btn-ios').className = platform === 'ios' ? 'platform-btn platform-active flex items-center gap-1' : 'platform-btn platform-inactive flex items-center gap-1';
+
+            // Update UI Elements
+            const bubble = document.getElementById('notiBubble');
+            const iconBox = document.getElementById('notiIconBox');
+            const expandIcon = document.getElementById('prevExpandIcon');
+            const deviceContainer = document.getElementById('deviceContainer');
+            
+            if(platform === 'ios') {
+                deviceContainer.classList.add('bg-gray-200');
+                deviceContainer.classList.remove('bg-gray-100');
+                bubble.classList.add('ios-bubble');
+                iconBox.classList.add('ios-icon-container');
+                iconBox.classList.remove('rounded');
+                expandIcon.classList.add('hidden'); // iOS doesn't typically have the expand arrow in the same way
+                
+                // Set iOS Clock style
+                document.getElementById('statusBarTime').textContent = "9:41";
+                document.getElementById('statusBarTime').classList.add('font-bold', 'text-black');
+            } else {
+                deviceContainer.classList.remove('bg-gray-200');
+                deviceContainer.classList.add('bg-gray-100');
+                bubble.classList.remove('ios-bubble');
+                iconBox.classList.remove('ios-icon-container');
+                iconBox.classList.add('rounded');
+                expandIcon.classList.remove('hidden');
+                
+                document.getElementById('statusBarTime').textContent = "12:00";
+                document.getElementById('statusBarTime').classList.remove('font-bold', 'text-black');
+            }
+        }
+
         function toggleNotiPreview() {
+            // Only allow toggle if Android
+            if (currentPlatform === 'ios') return;
+
             isPreviewExpanded = !isPreviewExpanded;
             const msgEl = document.getElementById('prevMessage');
             const iconEl = document.getElementById('prevExpandIcon');
@@ -485,16 +536,29 @@
             document.getElementById('prevMessage').textContent = message;
             
             const imgContainer = document.getElementById('prevImageContainer');
-            if(image) { imgContainer.style.backgroundImage = `url('${image}')`; } 
+            if(image) { 
+                imgContainer.style.backgroundImage = `url('${image}')`; 
+                // If iOS, image is usually shown on the right side thumbnail, but for simplicity here we just show it if expanded or we can auto-expand for iOS
+                if(currentPlatform === 'ios') {
+                    imgContainer.classList.remove('hidden');
+                    document.getElementById('prevMessage').classList.remove('line-clamp-1');
+                }
+            } else {
+                imgContainer.classList.add('hidden');
+            }
             
-            // Reset to Collapsed State
-            isPreviewExpanded = false;
-            document.getElementById('prevMessage').classList.add('line-clamp-1');
-            document.getElementById('prevExpandIcon').textContent = 'expand_more';
-            imgContainer.classList.add('hidden');
+            // Reset to Collapsed State for Android
+            if (currentPlatform === 'android') {
+                isPreviewExpanded = false;
+                document.getElementById('prevMessage').classList.add('line-clamp-1');
+                document.getElementById('prevExpandIcon').textContent = 'expand_more';
+                imgContainer.classList.add('hidden');
+            }
 
             document.getElementById('previewEmpty').classList.add('hidden');
             document.getElementById('previewFilled').classList.remove('hidden');
+            document.getElementById('platformSelector').classList.remove('hidden');
+            
             closeModal();
         }
 
@@ -530,6 +594,7 @@
                 document.getElementById('notiTitle').value = ''; document.getElementById('notiMessage').value = ''; document.getElementById('notiImage').value = '';
                 document.getElementById('previewEmpty').classList.remove('hidden');
                 document.getElementById('previewFilled').classList.add('hidden');
+                document.getElementById('platformSelector').classList.add('hidden');
                 
                 setTimeout(fetchRecentNotifications, 2000); 
 
@@ -569,12 +634,9 @@
                             <span class="flex items-center gap-1"><span class="material-icons text-green-500" style="font-size: 12px;">done_all</span> Delivered: ${delivered}</span>
                             <span class="flex items-center gap-1"><span class="material-icons" style="font-size: 12px;">schedule</span> ${dateStr}</span>
                         </div>
-                        <div class="flex gap-2 mt-3">
-                            <button onclick="duplicateNoti(${index})" class="flex-1 text-[11px] bg-white border hover:bg-gray-100 text-gray-700 py-1.5 rounded flex items-center justify-center gap-1 font-medium transition">
+                        <div class="mt-3">
+                            <button onclick="duplicateNoti(${index})" class="w-full text-[11px] bg-white border hover:bg-gray-100 text-gray-700 py-1.5 rounded flex items-center justify-center gap-1 font-medium transition">
                                 <span class="material-icons" style="font-size: 14px;">content_copy</span> Edit & Reuse
-                            </button>
-                            <button onclick="viewReport('${noti.id}')" class="flex-1 text-[11px] bg-purple-100 hover:bg-purple-200 text-purple-700 py-1.5 rounded flex items-center justify-center gap-1 font-medium transition">
-                                <span class="material-icons" style="font-size: 14px;">bar_chart</span> Report
                             </button>
                         </div>
                     `;
@@ -591,10 +653,6 @@
             openModal(); 
         }
 
-        function viewReport(notiId) {
-            const appId = document.getElementById('osAppId').value.trim();
-            window.open(`https://onesignal.com/apps/${appId}/messages/${notiId}`, '_blank');
-        }
     </script>
 </body>
 </html>
